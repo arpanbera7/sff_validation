@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 
 st.set_page_config(page_title="SFF Validator", layout="wide")
 st.title("🧪 SFF File Validator")
@@ -12,9 +13,7 @@ if uploaded_file:
     df.columns = df.columns.str.upper().str.strip()
 
     st.subheader("🧩 Select Columns for Consistency Check")
-
-    # Show available columns for debugging
-    # st.write("📋 Columns in uploaded file:", df.columns.tolist())
+    st.write("📋 Columns in uploaded file:", df.columns.tolist())
 
     # Dropdowns for selecting relevant columns
     selected_manufacturer = st.selectbox("Select Manufacturer Column", options=df.columns, key="manufacturer")
@@ -29,36 +28,45 @@ if uploaded_file:
     for col in [selected_manufacturer, selected_brand, selected_subbrand, 'ITEM']:
         df[col] = df[col].astype(str).str.upper().str.strip()
 
-    # Filter rows where ITEM is not blank or 'nan'
-    df_filtered = df[~df['ITEM'].isin(['', 'NAN'])]
+    # Start timer
+    start_time = time.time()
 
-    # Define consistency check logic
-    special_values = ['ALL OTHER', 'PRIVATE LABEL']
+    with st.spinner("⏳ Please wait... Validating your file..."):
+        # Filter rows where ITEM is not blank or 'nan'
+        df_filtered = df[~df['ITEM'].isin(['', 'NAN'])]
 
-    def is_valid(value, expected):
-        return value == expected or value.endswith(' MASKED')
+        # Define special values
+        special_values = ['ALL OTHER', 'PRIVATE LABEL']
 
-    def is_inconsistent(row):
-        m = row[selected_manufacturer]
-        b = row[selected_brand]
-        s = row[selected_subbrand]
+        # Vectorized consistency check
+        mask_inconsistent = pd.Series(False, index=df_filtered.index)
+
         for val in special_values:
-            if m == val and not (is_valid(b, val) and is_valid(s, val)):
-                return True
-            if b == val and not (is_valid(m, val) and is_valid(s, val)):
-                return True
-            if s == val and not (is_valid(m, val) and is_valid(b, val)):
-                return True
-        return False
+            m_mask = df_filtered[selected_manufacturer] == val
+            b_mask = df_filtered[selected_brand] == val
+            s_mask = df_filtered[selected_subbrand] == val
 
-    # Apply consistency check
-    inconsistent_rows = df_filtered[df_filtered.apply(is_inconsistent, axis=1)]
+            m_valid = (df_filtered[selected_manufacturer] == val) | df_filtered[selected_manufacturer].str.endswith(' MASKED')
+            b_valid = (df_filtered[selected_brand] == val) | df_filtered[selected_brand].str.endswith(' MASKED')
+            s_valid = (df_filtered[selected_subbrand] == val) | df_filtered[selected_subbrand].str.endswith(' MASKED')
 
-    # Bad value check
-    bad_values = ['TO BE CHECK', 'TO BE CHECKED', 'BADVALUE', 'TBC']
-    bad_value_rows = df[df.apply(lambda row: row.astype(str).str.upper().str.strip().isin(bad_values).any(), axis=1)]
+            mask_inconsistent |= (m_mask & ~(b_valid & s_valid))
+            mask_inconsistent |= (b_mask & ~(m_valid & s_valid))
+            mask_inconsistent |= (s_mask & ~(m_valid & b_valid))
+
+        inconsistent_rows = df_filtered[mask_inconsistent]
+
+        # Vectorized bad value check
+        bad_values = ['TO BE CHECK', 'TO BE CHECKED', 'BADVALUE', 'TBC']
+        df_str = df.astype(str).apply(lambda x: x.str.upper().str.strip())
+        bad_value_rows = df[df_str.isin(bad_values).any(axis=1)]
+
+    # End timer
+    end_time = time.time()
+    elapsed = end_time - start_time
 
     # Display results
+    st.success(f"✅ Validation complete in {elapsed:.2f} seconds.")
     st.subheader("🔍 Validation Results")
     st.write(f"**Inconsistent Rows (Rule 1):** {len(inconsistent_rows)}")
     st.write(f"**Rows with Bad Values (Rule 2):** {len(bad_value_rows)}")
