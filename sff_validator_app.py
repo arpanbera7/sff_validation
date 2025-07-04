@@ -24,64 +24,66 @@ if uploaded_file:
 
     selected_subbrand = st.selectbox("Select Subbrand Column", options=remaining_cols_2, key="subbrand")
 
-    # Normalize selected columns and ITEM
-    for col in [selected_manufacturer, selected_brand, selected_subbrand, 'ITEM']:
-        df[col] = df[col].astype(str).str.upper().str.strip()
+    # Submit button to trigger validation
+    if st.button("🚀 Submit and Validate"):
+        # Normalize selected columns and ITEM
+        for col in [selected_manufacturer, selected_brand, selected_subbrand, 'ITEM']:
+            df[col] = df[col].astype(str).str.upper().str.strip()
 
-    # Start timer
-    start_time = time.time()
+        # Start timer
+        start_time = time.time()
 
-    with st.spinner("⏳ Please wait... Validating your file..."):
-        # Filter rows where ITEM is not blank or 'nan'
-        df_filtered = df[~df['ITEM'].isin(['', 'NAN'])]
+        with st.spinner("⏳ Please wait... Validating your file..."):
+            # Filter rows where ITEM is not blank or 'nan'
+            df_filtered = df[~df['ITEM'].isin(['', 'NAN'])]
 
-        # Define special values
-        special_values = ['ALL OTHER', 'PRIVATE LABEL']
+            # Define special values
+            special_values = ['ALL OTHER', 'PRIVATE LABEL']
 
-        # Vectorized consistency check
-        mask_inconsistent = pd.Series(False, index=df_filtered.index)
+            # Vectorized consistency check
+            mask_inconsistent = pd.Series(False, index=df_filtered.index)
 
-        for val in special_values:
-            m_mask = df_filtered[selected_manufacturer] == val
-            b_mask = df_filtered[selected_brand] == val
-            s_mask = df_filtered[selected_subbrand] == val
+            for val in special_values:
+                m_mask = df_filtered[selected_manufacturer] == val
+                b_mask = df_filtered[selected_brand] == val
+                s_mask = df_filtered[selected_subbrand] == val
 
-            m_valid = (df_filtered[selected_manufacturer] == val) | df_filtered[selected_manufacturer].str.endswith(' MASKED')
-            b_valid = (df_filtered[selected_brand] == val) | df_filtered[selected_brand].str.endswith(' MASKED')
-            s_valid = (df_filtered[selected_subbrand] == val) | df_filtered[selected_subbrand].str.endswith(' MASKED')
+                m_valid = (df_filtered[selected_manufacturer] == val) | df_filtered[selected_manufacturer].str.endswith(' MASKED')
+                b_valid = (df_filtered[selected_brand] == val) | df_filtered[selected_brand].str.endswith(' MASKED')
+                s_valid = (df_filtered[selected_subbrand] == val) | df_filtered[selected_subbrand].str.endswith(' MASKED')
 
-            mask_inconsistent |= (m_mask & ~(b_valid & s_valid))
-            mask_inconsistent |= (b_mask & ~(m_valid & s_valid))
-            mask_inconsistent |= (s_mask & ~(m_valid & b_valid))
+                mask_inconsistent |= (m_mask & ~(b_valid & s_valid))
+                mask_inconsistent |= (b_mask & ~(m_valid & s_valid))
+                mask_inconsistent |= (s_mask & ~(m_valid & b_valid))
 
-        inconsistent_rows = df_filtered[mask_inconsistent]
+            inconsistent_rows = df_filtered[mask_inconsistent]
 
-        # Vectorized bad value check
-        bad_values = ['TO BE CHECK', 'TO BE CHECKED', 'BADVALUE', 'TBC']
-        df_str = df.astype(str).apply(lambda x: x.str.upper().str.strip())
-        bad_value_rows = df[df_str.isin(bad_values).any(axis=1)]
+            # Vectorized bad value check
+            bad_values = ['TO BE CHECK', 'TO BE CHECKED', 'BADVALUE', 'TBC']
+            df_str = df.astype(str).apply(lambda x: x.str.upper().str.strip())
+            bad_value_rows = df[df_str.isin(bad_values).any(axis=1)]
 
-    # End timer
-    end_time = time.time()
-    elapsed = end_time - start_time
+        # End timer
+        end_time = time.time()
+        elapsed = end_time - start_time
 
-    # Display results
-    st.success(f"✅ Validation complete in {elapsed:.2f} seconds.")
-    st.subheader("🔍 Validation Results")
-    st.write(f"**Inconsistent Rows (Rule 1):** {len(inconsistent_rows)}")
-    st.write(f"**Rows with Bad Values (Rule 2):** {len(bad_value_rows)}")
+        # Display results
+        st.success(f"✅ Validation complete in {elapsed:.2f} seconds.")
+        st.subheader("🔍 Validation Results")
+        st.write(f"**Inconsistent Rows (Rule 1):** {len(inconsistent_rows)}")
+        st.write(f"**Rows with Bad Values (Rule 2):** {len(bad_value_rows)}")
 
-    # Combined download section
-    if not inconsistent_rows.empty or not bad_value_rows.empty:
-        st.subheader("📥 Download Validation Results")
-        col1, col2 = st.columns(2)
+        # Combined download section
+        if not inconsistent_rows.empty or not bad_value_rows.empty:
+            st.subheader("📥 Download Validation Results")
+            col1, col2 = st.columns(2)
 
-        with col1:
-            if not inconsistent_rows.empty:
-                inconsistent_csv = inconsistent_rows.to_csv(index=False).encode('utf-8')
-                st.download_button("Download Inconsistent Rows", inconsistent_csv, "inconsistent_rows.csv", "text/csv")
+            with col1:
+                if not inconsistent_rows.empty:
+                    inconsistent_csv = inconsistent_rows.to_csv(index=False).encode('utf-8')
+                    st.download_button("Download Inconsistent Rows", inconsistent_csv, "inconsistent_rows.csv", "text/csv")
 
-        with col2:
-            if not bad_value_rows.empty:
-                badvalue_csv = bad_value_rows.to_csv(index=False).encode('utf-8')
-                st.download_button("Download Bad Value Rows", badvalue_csv, "bad_value_rows.csv", "text/csv")
+            with col2:
+                if not bad_value_rows.empty:
+                    badvalue_csv = bad_value_rows.to_csv(index=False).encode('utf-8')
+                    st.download_button("Download Bad Value Rows", badvalue_csv, "bad_value_rows.csv", "text/csv")
