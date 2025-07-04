@@ -14,7 +14,7 @@ if uploaded_file:
     st.subheader("🧩 Select Columns for Consistency Check")
 
     # Show available columns for debugging
-    st.write("📋 Columns in uploaded file:", df.columns.tolist())
+    # st.write("📋 Columns in uploaded file:", df.columns.tolist())
 
     # Dropdowns for selecting relevant columns
     selected_manufacturer = st.selectbox("Select Manufacturer Column", options=df.columns, key="manufacturer")
