@@ -8,9 +8,13 @@ st.title("🧪 SFF File Validator")
 uploaded_file = st.file_uploader("Upload your SFF CSV file", type=["csv"])
 
 if uploaded_file:
-    # Read and normalize column names
-    df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
-    df.columns = df.columns.str.upper().str.strip()
+    try:
+        # Safe CSV reading with fallback
+        df = pd.read_csv(uploaded_file, encoding='utf-8-sig', on_bad_lines='skip', low_memory=False)
+        df.columns = df.columns.str.upper().str.strip()
+    except Exception as e:
+        st.error(f"❌ Failed to read the file. Please check formatting. Error: {e}")
+        st.stop()
 
     st.subheader("🧩 Select Columns for Consistency Check")
     st.write("📋 Columns in uploaded file:", df.columns.tolist())
