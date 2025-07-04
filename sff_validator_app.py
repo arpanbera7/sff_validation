@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import io
 
 st.set_page_config(page_title="SFF Validator", layout="wide")
 st.title("🧪 SFF File Validator")
@@ -8,14 +7,33 @@ st.title("🧪 SFF File Validator")
 uploaded_file = st.file_uploader("Upload your SFF CSV file", type=["csv"])
 
 if uploaded_file:
-    df = pd.read_csv(uploaded_file)
+    # Read and normalize column names
+    df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
+    df.columns = df.columns.str.upper().str.strip()
 
-    # Normalize relevant columns
-    for col in ['MANUFACTURER', 'BRAND', 'SUBBRAND', 'ITEM']:
+    st.subheader("🧩 Select Columns for Consistency Check")
+
+    # Show available columns for debugging
+    st.write("📋 Columns in uploaded file:", df.columns.tolist())
+
+    # Dropdowns for selecting relevant columns
+    selected_manufacturer = st.selectbox("Select Manufacturer Column", options=df.columns, key="manufacturer")
+    remaining_cols_1 = [col for col in df.columns if col != selected_manufacturer]
+
+    selected_brand = st.selectbox("Select Brand Column", options=remaining_cols_1, key="brand")
+    remaining_cols_2 = [col for col in remaining_cols_1 if col != selected_brand]
+
+    selected_subbrand = st.selectbox("Select Subbrand Column", options=remaining_cols_2, key="subbrand")
+    remaining_cols_3 = [col for col in remaining_cols_2 if col != selected_subbrand]
+
+    selected_item = st.selectbox("Select Item Column", options=remaining_cols_3, key="item")
+
+    # Normalize selected columns
+    for col in [selected_manufacturer, selected_brand, selected_subbrand, selected_item]:
         df[col] = df[col].astype(str).str.upper().str.strip()
 
     # Filter rows where ITEM is not blank or 'nan'
-    df_filtered = df[~df['ITEM'].isin(['', 'NAN'])]
+    df_filtered = df[~df[selected_item].isin(['', 'NAN'])]
 
     # Define consistency check logic
     special_values = ['ALL OTHER', 'PRIVATE LABEL']
@@ -24,7 +42,9 @@ if uploaded_file:
         return value == expected or value.endswith(' MASKED')
 
     def is_inconsistent(row):
-        m, b, s = row['MANUFACTURER'], row['BRAND'], row['SUBBRAND']
+        m = row[selected_manufacturer]
+        b = row[selected_brand]
+        s = row[selected_subbrand]
         for val in special_values:
             if m == val and not (is_valid(b, val) and is_valid(s, val)):
                 return True
@@ -34,6 +54,7 @@ if uploaded_file:
                 return True
         return False
 
+    # Apply consistency check
     inconsistent_rows = df_filtered[df_filtered.apply(is_inconsistent, axis=1)]
 
     # Bad value check
@@ -45,11 +66,17 @@ if uploaded_file:
     st.write(f"**Inconsistent Rows (Rule 1):** {len(inconsistent_rows)}")
     st.write(f"**Rows with Bad Values (Rule 2):** {len(bad_value_rows)}")
 
-    # Download buttons
-    if not inconsistent_rows.empty:
-        inconsistent_csv = inconsistent_rows.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Inconsistent Rows", inconsistent_csv, "inconsistent_rows.csv", "text/csv")
+    # Combined download section
+    if not inconsistent_rows.empty or not bad_value_rows.empty:
+        st.subheader("📥 Download Validation Results")
+        col1, col2 = st.columns(2)
 
-    if not bad_value_rows.empty:
-        badvalue_csv = bad_value_rows.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Bad Value Rows", badvalue_csv, "bad_value_rows.csv", "text/csv")
+        with col1:
+            if not inconsistent_rows.empty:
+                inconsistent_csv = inconsistent_rows.to_csv(index=False).encode('utf-8')
+                st.download_button("Download Inconsistent Rows", inconsistent_csv, "inconsistent_rows.csv", "text/csv")
+
+        with col2:
+            if not bad_value_rows.empty:
+                badvalue_csv = bad_value_rows.to_csv(index=False).encode('utf-8')
+                st.download_button("Download Bad Value Rows", badvalue_csv, "bad_value_rows.csv", "text/csv")
