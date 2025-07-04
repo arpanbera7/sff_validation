@@ -24,16 +24,13 @@ if uploaded_file:
     remaining_cols_2 = [col for col in remaining_cols_1 if col != selected_brand]
 
     selected_subbrand = st.selectbox("Select Subbrand Column", options=remaining_cols_2, key="subbrand")
-    remaining_cols_3 = [col for col in remaining_cols_2 if col != selected_subbrand]
 
-    selected_item = st.selectbox("Select Item Column", options=remaining_cols_3, key="item")
-
-    # Normalize selected columns
-    for col in [selected_manufacturer, selected_brand, selected_subbrand, selected_item]:
+    # Normalize selected columns and ITEM
+    for col in [selected_manufacturer, selected_brand, selected_subbrand, 'ITEM']:
         df[col] = df[col].astype(str).str.upper().str.strip()
 
     # Filter rows where ITEM is not blank or 'nan'
-    df_filtered = df[~df[selected_item].isin(['', 'NAN'])]
+    df_filtered = df[~df['ITEM'].isin(['', 'NAN'])]
 
     # Define consistency check logic
     special_values = ['ALL OTHER', 'PRIVATE LABEL']
